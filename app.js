@@ -86,6 +86,29 @@ ocrRetryBtn.addEventListener("click", () => {
   if (lastScanFile) runOcr(lastScanFile);
 });
 
+/**
+ * 모니터 화면을 카메라로 찍으면 화면 픽셀 격자와 카메라 센서 격자가 겹치면서
+ * 실제로는 없는 물결무늬(무아레)가 생겨 OCR을 심하게 방해한다.
+ * 흑백화 + 살짝 블러(고주파 노이즈 완화) + 대비 강화로 이를 줄인다.
+ */
+async function preprocessForOcr(file) {
+  const bitmap = await createImageBitmap(file);
+  const maxDim = 1800;
+  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.filter = "grayscale(1) blur(1px) contrast(1.5) brightness(1.05)";
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+
+  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), "image/png"));
+}
+
 function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
@@ -127,7 +150,9 @@ async function runOcr(file) {
     // 행 순서를 망가뜨리는 경우가 많다. "균일한 한 덩어리 텍스트"로 강제해서
     // 위→아래 줄 순서를 그대로 유지시킨다.
     await worker.setParameters({ tessedit_pageseg_mode: "6" });
-    const { data } = await withTimeout(worker.recognize(file), 45000, "글자 인식");
+    ocrProgressText.textContent = "화면 반사·무아레 무늬 보정 중…";
+    const processed = await preprocessForOcr(file);
+    const { data } = await withTimeout(worker.recognize(processed), 45000, "글자 인식");
     await worker.terminate();
 
     ocrProgress.hidden = true;
