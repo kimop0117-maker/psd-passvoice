@@ -86,27 +86,143 @@ ocrRetryBtn.addEventListener("click", () => {
   if (lastScanFile) runOcr(lastScanFile);
 });
 
+/* ---------- OpenCV.js 기반 문서 스캐너 전처리 ---------- */
+let openCvLoadPromise = null;
+function loadOpenCv() {
+  if (openCvLoadPromise) return openCvLoadPromise;
+  openCvLoadPromise = new Promise((resolve, reject) => {
+    if (window.cv && window.cv.Mat) { resolve(window.cv); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.12.0-release.1/dist/opencv.js";
+    script.onload = () => {
+      const cv = window.cv;
+      if (!cv) { reject(new Error("OpenCV.js를 불러왔지만 cv 객체를 찾지 못했습니다.")); return; }
+      if (cv.Mat) { resolve(cv); return; }
+      cv["onRuntimeInitialized"] = () => resolve(cv);
+    };
+    script.onerror = () => reject(new Error("OpenCV.js 스크립트를 내려받지 못했습니다(네트워크 확인 필요)."));
+    document.head.appendChild(script);
+  });
+  return openCvLoadPromise;
+}
+
+/** 4개 점을 [좌상, 우상, 우하, 좌하] 순서로 정렬한다. */
+function orderQuadPoints(pts) {
+  const sums = pts.map((p) => p.x + p.y);
+  const diffs = pts.map((p) => p.x - p.y);
+  const tl = pts[sums.indexOf(Math.min(...sums))];
+  const br = pts[sums.indexOf(Math.max(...sums))];
+  const tr = pts[diffs.indexOf(Math.max(...diffs))];
+  const bl = pts[diffs.indexOf(Math.min(...diffs))];
+  return [tl, tr, br, bl];
+}
+
 /**
- * 모니터 화면을 카메라로 찍으면 화면 픽셀 격자와 카메라 센서 격자가 겹치면서
- * 실제로는 없는 물결무늬(무아레)가 생겨 OCR을 심하게 방해한다.
- * 흑백화 + 살짝 블러(고주파 노이즈 완화) + 대비 강화로 이를 줄인다.
+ * 구글렌즈/오피스렌즈 같은 문서 스캐너 앱이 하는 것과 같은 순서로 전처리한다:
+ * 1) 화면(문서) 경계를 찾아 2) 원근왜곡을 펴서 정면 크롭하고 3) 부분별 밝기 차이에
+ * 강한 적응형 이진화로 깨끗한 흑백 문서를 만든다. 모니터 반사광·기울어진 촬영각·
+ * 무아레 무늬에 전역 대비 조정보다 훨씬 강하다. 경계를 못 찾으면 원본 전체를
+ * 그대로 이진화해서 최소한의 개선만 적용한다.
  */
-async function preprocessForOcr(file) {
-  const bitmap = await createImageBitmap(file);
-  const maxDim = 1800;
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+async function scanDocument(file, onStatus) {
+  const cv = await loadOpenCv();
+  const cleanup = [];
+  const track = (m) => { cleanup.push(m); return m; };
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  ctx.filter = "grayscale(1) blur(1px) contrast(1.5) brightness(1.05)";
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
+  try {
+    onStatus && onStatus("문서 경계 찾는 중…");
+    const bitmap = await createImageBitmap(file);
+    const srcCanvas = document.createElement("canvas");
+    srcCanvas.width = bitmap.width;
+    srcCanvas.height = bitmap.height;
+    srcCanvas.getContext("2d").drawImage(bitmap, 0, 0);
+    bitmap.close();
 
-  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob || file), "image/png"));
+    const src = track(cv.imread(srcCanvas));
+
+    const workWidth = 700;
+    const scale = Math.min(1, workWidth / src.cols);
+    const small = track(new cv.Mat());
+    cv.resize(src, small, new cv.Size(Math.round(src.cols * scale), Math.round(src.rows * scale)));
+
+    const gray = track(new cv.Mat());
+    cv.cvtColor(small, gray, cv.COLOR_RGBA2GRAY);
+    const blurredSmall = track(new cv.Mat());
+    cv.GaussianBlur(gray, blurredSmall, new cv.Size(5, 5), 0);
+    const edges = track(new cv.Mat());
+    cv.Canny(blurredSmall, edges, 50, 150);
+    const kernel = track(cv.Mat.ones(3, 3, cv.CV_8U));
+    const dilated = track(new cv.Mat());
+    cv.dilate(edges, dilated, kernel);
+
+    const contours = track(new cv.MatVector());
+    const hierarchy = track(new cv.Mat());
+    cv.findContours(dilated, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+    let bestQuad = null;
+    let bestArea = 0;
+    for (let i = 0; i < contours.size(); i++) {
+      const cnt = contours.get(i);
+      const peri = cv.arcLength(cnt, true);
+      const approx = new cv.Mat();
+      cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+      if (approx.rows === 4 && cv.isContourConvex(approx)) {
+        const area = cv.contourArea(approx);
+        if (area > bestArea && area > small.cols * small.rows * 0.2) {
+          bestArea = area;
+          if (bestQuad) bestQuad.delete();
+          bestQuad = approx;
+        } else {
+          approx.delete();
+        }
+      } else {
+        approx.delete();
+      }
+      cnt.delete();
+    }
+
+    let warped = null;
+    if (bestQuad) {
+      const pts = [];
+      for (let i = 0; i < 4; i++) {
+        const p = bestQuad.intPtr(i, 0);
+        pts.push({ x: p[0] / scale, y: p[1] / scale });
+      }
+      bestQuad.delete();
+      const [tl, tr, br, bl] = orderQuadPoints(pts);
+      const widthTop = Math.hypot(tr.x - tl.x, tr.y - tl.y);
+      const widthBottom = Math.hypot(br.x - bl.x, br.y - bl.y);
+      const heightLeft = Math.hypot(bl.x - tl.x, bl.y - tl.y);
+      const heightRight = Math.hypot(br.x - tr.x, br.y - tr.y);
+      const dstW = Math.round(Math.max(widthTop, widthBottom));
+      const dstH = Math.round(Math.max(heightLeft, heightRight));
+
+      if (dstW > 150 && dstH > 150) {
+        onStatus && onStatus("기울어진 각도 펴는 중…");
+        const srcTri = track(cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]));
+        const dstTri = track(cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, dstW, 0, dstW, dstH, 0, dstH]));
+        const M = track(cv.getPerspectiveTransform(srcTri, dstTri));
+        warped = track(new cv.Mat());
+        cv.warpPerspective(src, warped, M, new cv.Size(dstW, dstH));
+      }
+    }
+
+    onStatus && onStatus("흑백 문서로 정리하는 중…");
+    const base = warped || src;
+    const g2 = track(new cv.Mat());
+    cv.cvtColor(base, g2, cv.COLOR_RGBA2GRAY);
+    const denoised = track(new cv.Mat());
+    cv.medianBlur(g2, denoised, 3);
+    const thresh = track(new cv.Mat());
+    cv.adaptiveThreshold(denoised, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 31, 15);
+
+    const outCanvas = document.createElement("canvas");
+    cv.imshow(outCanvas, thresh);
+
+    return await new Promise((resolve) => outCanvas.toBlob((blob) => resolve(blob || file), "image/png"));
+  } finally {
+    cleanup.forEach((m) => { try { m.delete(); } catch { /* 이미 해제됐으면 무시 */ } });
+  }
 }
 
 function withTimeout(promise, ms, label) {
@@ -119,6 +235,7 @@ function withTimeout(promise, ms, label) {
 async function runOcr(file) {
   scanPreview.src = URL.createObjectURL(file);
   scanPreviewWrap.hidden = false;
+  document.getElementById("scanProcessedWrap").hidden = true;
   parsedWrap.hidden = true;
   hideOcrDebug();
   hideOcrError();
@@ -134,6 +251,15 @@ async function runOcr(file) {
 
   let worker = null;
   try {
+    ocrProgressText.textContent = "문서 스캐너 엔진 불러오는 중… (처음 한 번만, 다소 걸릴 수 있습니다)";
+    const processed = await withTimeout(
+      scanDocument(file, (msg) => { ocrProgressText.textContent = msg; }),
+      60000,
+      "문서 스캐너 전처리"
+    );
+    document.getElementById("scanProcessedPreview").src = URL.createObjectURL(processed);
+    document.getElementById("scanProcessedWrap").hidden = false;
+
     worker = await withTimeout(
       Tesseract.createWorker("kor+eng", 1, {
         logger: (m) => {
@@ -150,8 +276,6 @@ async function runOcr(file) {
     // 행 순서를 망가뜨리는 경우가 많다. "균일한 한 덩어리 텍스트"로 강제해서
     // 위→아래 줄 순서를 그대로 유지시킨다.
     await worker.setParameters({ tessedit_pageseg_mode: "6" });
-    ocrProgressText.textContent = "화면 반사·무아레 무늬 보정 중…";
-    const processed = await preprocessForOcr(file);
     const { data } = await withTimeout(worker.recognize(processed), 45000, "글자 인식");
     await worker.terminate();
 
