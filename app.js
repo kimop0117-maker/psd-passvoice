@@ -138,7 +138,14 @@ async function scanDocument(file, onStatus) {
     srcCanvas.getContext("2d").drawImage(bitmap, 0, 0);
     bitmap.close();
 
-    const src = track(cv.imread(srcCanvas));
+    const fullRes = track(cv.imread(srcCanvas));
+    // 폰 사진은 보통 3000~4000px가 넘는데, 이 해상도로 medianBlur/adaptiveThreshold를
+    // 돌리면 단일 스레드 WASM에서 사실상 멈춘 것처럼 느려진다(수십 분 단위).
+    // OCR엔 이 이상의 해상도가 필요하지도 않으므로 처음부터 줄여서 작업한다.
+    const maxDim = 1600;
+    const dScale = Math.min(1, maxDim / Math.max(fullRes.cols, fullRes.rows));
+    const src = track(new cv.Mat());
+    cv.resize(fullRes, src, new cv.Size(Math.round(fullRes.cols * dScale), Math.round(fullRes.rows * dScale)));
 
     const workWidth = 700;
     const scale = Math.min(1, workWidth / src.cols);
