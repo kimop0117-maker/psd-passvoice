@@ -71,31 +71,63 @@ const parsedCount = document.getElementById("parsedCount");
 
 let currentParsedRows = [];
 
-imgInput.addEventListener("change", async (e) => {
+const ocrError = document.getElementById("ocrError");
+const ocrErrorText = document.getElementById("ocrErrorText");
+const ocrRetryBtn = document.getElementById("ocrRetryBtn");
+let lastScanFile = null;
+
+imgInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  lastScanFile = file;
+  runOcr(file);
+});
+ocrRetryBtn.addEventListener("click", () => {
+  if (lastScanFile) runOcr(lastScanFile);
+});
 
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} 응답이 ${ms / 1000}초 넘게 없습니다. 인터넷 연결(특히 사내/공공 와이파이 차단)을 의심해보세요.`)), ms)),
+  ]);
+}
+
+async function runOcr(file) {
   scanPreview.src = URL.createObjectURL(file);
   scanPreviewWrap.hidden = false;
   parsedWrap.hidden = true;
+  hideOcrDebug();
+  hideOcrError();
   ocrProgress.hidden = false;
   ocrBarFill.style.width = "0%";
   ocrProgressText.textContent = "인식 준비 중… (처음 실행 시 한글 인식 모듈을 내려받아 다소 걸립니다)";
 
+  if (typeof Tesseract === "undefined") {
+    ocrProgress.hidden = true;
+    showOcrError("OCR 엔진(Tesseract.js)을 불러오지 못했습니다. 인터넷 연결을 확인하거나, 와이파이가 외부 CDN을 막고 있다면 데이터(LTE/5G)로 전환해서 다시 시도해보세요.");
+    return;
+  }
+
+  let worker = null;
   try {
-    const worker = await Tesseract.createWorker("kor+eng", 1, {
-      logger: (m) => {
-        if (m.status && typeof m.progress === "number") {
-          ocrBarFill.style.width = `${Math.round(m.progress * 100)}%`;
-          ocrProgressText.textContent = `${ocrStatusKo(m.status)} ${Math.round(m.progress * 100)}%`;
-        }
-      },
-    });
+    worker = await withTimeout(
+      Tesseract.createWorker("kor+eng", 1, {
+        logger: (m) => {
+          if (m.status && typeof m.progress === "number") {
+            ocrBarFill.style.width = `${Math.round(m.progress * 100)}%`;
+            ocrProgressText.textContent = `${ocrStatusKo(m.status)} ${Math.round(m.progress * 100)}%`;
+          }
+        },
+      }),
+      45000,
+      "한글 인식 모듈 다운로드"
+    );
     // 엑셀 표처럼 격자선이 있는 이미지는 자동 레이아웃 분석이 열을 따로따로 묶어
     // 행 순서를 망가뜨리는 경우가 많다. "균일한 한 덩어리 텍스트"로 강제해서
     // 위→아래 줄 순서를 그대로 유지시킨다.
     await worker.setParameters({ tessedit_pageseg_mode: "6" });
-    const { data } = await worker.recognize(file);
+    const { data } = await withTimeout(worker.recognize(file), 45000, "글자 인식");
     await worker.terminate();
 
     ocrProgress.hidden = true;
@@ -105,17 +137,23 @@ imgInput.addEventListener("change", async (e) => {
 
     if (currentParsedRows.length === 0) {
       showOcrDebug(data.text);
-    } else {
-      hideOcrDebug();
     }
   } catch (err) {
     ocrProgress.hidden = true;
-    alert("인식에 실패했습니다: " + err.message);
+    if (worker) { try { await worker.terminate(); } catch { /* 이미 종료됐으면 무시 */ } }
+    showOcrError(`${err.name || "오류"}: ${err.message}`);
   }
-});
+}
 
 const ocrDebug = document.getElementById("ocrDebug");
 const ocrDebugText = document.getElementById("ocrDebugText");
+function showOcrError(msg) {
+  ocrErrorText.textContent = msg;
+  ocrError.hidden = false;
+}
+function hideOcrError() {
+  ocrError.hidden = true;
+}
 function showOcrDebug(rawText) {
   ocrDebugText.textContent = rawText.trim() || "(인식된 글자가 없습니다)";
   ocrDebug.hidden = false;
@@ -259,6 +297,39 @@ function renderListTab() {
     });
   });
 }
+
+/* ---------- 백업 내보내기 / 불러오기 ---------- */
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const db = loadDB();
+  if (!db.length) { alert("내보낼 데이터가 없습니다."); return; }
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `psd-passvoice-backup-${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("importInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) throw new Error("백업 파일 형식이 올바르지 않습니다.");
+    upsertRows(parsed);
+    renderListTab();
+    alert(`${parsed.length}개 역을 불러왔습니다.`);
+  } catch (err) {
+    alert("불러오기에 실패했습니다: " + err.message);
+  } finally {
+    e.target.value = "";
+  }
+});
 
 document.getElementById("addManualBtn").addEventListener("click", () => {
   const station = prompt("역명을 입력하세요 (예: 온수역)");

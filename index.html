@@ -62,6 +62,11 @@
       <span id="ocrProgressText">인식 준비 중…</span>
     </div>
 
+    <div id="ocrError" class="ocr-error" hidden>
+      <p id="ocrErrorText"></p>
+      <button id="ocrRetryBtn" class="ghost-btn">다시 시도</button>
+    </div>
+
     <div id="scanPreviewWrap" hidden>
       <img id="scanPreview" alt="선택한 표 사진 미리보기">
     </div>
@@ -91,6 +96,13 @@
   <!-- 전체 목록 탭 -->
   <section id="tab-list" class="tab">
     <p class="tab-desc">저장된 모든 역과 비밀번호입니다.</p>
+    <div class="backup-row">
+      <button id="exportBtn" class="ghost-btn">백업 파일로 내보내기</button>
+      <label class="ghost-btn filebtn-inline">
+        백업 파일 불러오기
+        <input id="importInput" type="file" accept="application/json">
+      </label>
+    </div>
     <button id="addManualBtn" class="ghost-btn">역 직접 추가</button>
     <div class="table-scroll">
       <table id="listTable">
