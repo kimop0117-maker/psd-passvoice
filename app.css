@@ -1,58 +1,82 @@
-@import url('https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --bg: #f6f5ef;
+  --bg: #f2f4f9;
   --surface: #ffffff;
-  --surface-2: #eef1df;
-  --ink: #20221a;
-  --ink-soft: #5b5f4d;
-  --ink-faint: #8b8f79;
-  --accent: #6f7a1f;
-  --accent-strong: #4f5716;
-  --line: #dcdccb;
-  --amber: #a6650f;
-  --danger: #b03a2e;
+  --surface-2: #e8edfa;
+  --ink: #1c2029;
+  --ink-soft: #565f70;
+  --ink-faint: #97a0b1;
+  --accent: #15298c;       /* Seoul Metro blue */
+  --accent-strong: #0c1c66;
+  --accent-soft: #dde4fa;
+  --line7: #6f7a1f;         /* 7호선 노선색 */
+  --line: #dbe1ee;
+  --amber: #b06a0f;
+  --danger: #c62f3c;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #1a1b14; --surface: #232419; --surface-2: #313420;
-    --ink: #ecefe1; --ink-soft: #b7bba4; --ink-faint: #82866e;
-    --accent: #b3c247; --accent-strong: #c9d968; --line: #3a3c2a;
-    --amber: #e0a352; --danger: #e07a6b;
+    --bg: #0f1320; --surface: #171c2c; --surface-2: #212842;
+    --ink: #e8ebf5; --ink-soft: #a6aec2; --ink-faint: #6b7386;
+    --accent: #6f89e6; --accent-strong: #a8b8f2; --accent-soft: #232c4d;
+    --line7: #b7c454; --line: #2b3350;
+    --amber: #e0a352; --danger: #e2707c;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #1a1b14; --surface: #232419; --surface-2: #313420;
-  --ink: #ecefe1; --ink-soft: #b7bba4; --ink-faint: #82866e;
-  --accent: #b3c247; --accent-strong: #c9d968; --line: #3a3c2a;
-  --amber: #e0a352; --danger: #e07a6b;
+  --bg: #0f1320; --surface: #171c2c; --surface-2: #212842;
+  --ink: #e8ebf5; --ink-soft: #a6aec2; --ink-faint: #6b7386;
+  --accent: #6f89e6; --accent-strong: #a8b8f2; --accent-soft: #232c4d;
+  --line7: #b7c454; --line: #2b3350;
+  --amber: #e0a352; --danger: #e2707c;
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
-  font-family: "Gothic A1", "Malgun Gothic", sans-serif;
+  font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
   padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 
+/* ---------- header ---------- */
 .topbar {
   display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px calc(12px + env(safe-area-inset-top)) 16px;
-  background: var(--ink); color: var(--bg);
+  padding: 10px 16px calc(10px + env(safe-area-inset-top)) 16px;
+  background: var(--accent); color: #fff;
   position: sticky; top: 0; z-index: 5;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
 }
+.topbar img.sm-mark { width: 26px; height: 26px; flex-shrink: 0; filter: brightness(0) invert(1); }
 .linebadge {
-  width: 24px; height: 24px; border-radius: 50%;
-  background: var(--accent-strong); color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--line7); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 13px; flex-shrink: 0;
+  font-weight: 700; font-size: 12px; flex-shrink: 0;
 }
-.apptitle { font-weight: 700; font-size: 15px; flex: 1; }
+.apptitle { font-weight: 700; font-size: 15px; flex: 1; letter-spacing: -0.01em; }
 .statuspill {
-  font-size: 11px; background: rgba(255,255,255,0.12);
-  padding: 4px 9px; border-radius: 100px; color: var(--bg);
+  font-size: 11px; background: rgba(255,255,255,0.16);
+  padding: 4px 9px; border-radius: 100px; color: #fff;
+}
+
+/* ---------- install banner ---------- */
+.install-banner {
+  display: flex; align-items: center; gap: 12px;
+  max-width: 560px; margin: 14px auto 0; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--accent-soft); border-radius: 12px;
+}
+.install-banner img { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; }
+.install-banner .ib-text { flex: 1; font-size: 12.5px; color: var(--ink-soft); }
+.install-banner .ib-text b { display: block; color: var(--ink); font-size: 13.5px; margin-bottom: 1px; }
+.install-banner button {
+  border: none; background: var(--accent); color: #fff; font: inherit; font-weight: 700;
+  font-size: 12.5px; padding: 8px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+}
+.install-banner .ib-close {
+  background: none; color: var(--ink-faint); font-weight: 400; font-size: 16px; padding: 4px 6px;
 }
 
 main { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
@@ -61,20 +85,23 @@ main { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
 .tab.active { display: block; }
 .tab-desc { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 20px; }
 
-.mic-wrap { display: flex; flex-direction: column; align-items: center; padding: 30px 0 10px; }
+/* ---------- voice tab ---------- */
+.mascot-row { display: flex; flex-direction: column; align-items: center; padding: 18px 0 4px; }
+.mascot-row img { width: 84px; height: 84px; border-radius: 50%; box-shadow: 0 2px 10px rgba(21,41,140,0.15); }
+.mic-wrap { display: flex; flex-direction: column; align-items: center; padding: 6px 0 10px; }
 .mic-btn {
   width: 92px; height: 92px; border-radius: 50%;
   background: var(--accent); color: #fff; border: none;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 18px rgba(79,87,22,0.28);
+  box-shadow: 0 4px 18px rgba(21,41,140,0.28);
   cursor: pointer; transition: transform .15s ease, background .2s ease;
 }
 .mic-btn:active { transform: scale(0.94); }
 .mic-btn.listening { background: var(--danger); animation: pulse 1.2s infinite; }
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(176,58,46,0.35); }
-  70% { box-shadow: 0 0 0 18px rgba(176,58,46,0); }
-  100% { box-shadow: 0 0 0 0 rgba(176,58,46,0); }
+  0% { box-shadow: 0 0 0 0 rgba(198,47,60,0.35); }
+  70% { box-shadow: 0 0 0 18px rgba(198,47,60,0); }
+  100% { box-shadow: 0 0 0 0 rgba(198,47,60,0); }
 }
 .mic-status { margin-top: 16px; font-size: 13.5px; color: var(--ink-soft); text-align: center; min-height: 18px; }
 
@@ -136,20 +163,22 @@ td input:focus { border-color: var(--accent); background: var(--surface); outlin
 .primary-btn {
   display: block; width: 100%; margin-top: 12px;
   padding: 12px; border-radius: 8px; border: none;
-  background: var(--accent-strong); color: #fff; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
 }
 
+/* ---------- popup ---------- */
 .popup-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  position: fixed; inset: 0; background: rgba(12,16,30,0.55);
   display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 20;
 }
+.popup-overlay[hidden] { display: none; }
 .popup-card {
   background: var(--surface); border-radius: 16px; padding: 26px 22px 22px;
   width: 100%; max-width: 320px; text-align: center;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
 }
 .popup-line {
-  width: 40px; height: 40px; border-radius: 50%; background: var(--accent-strong);
+  width: 40px; height: 40px; border-radius: 50%; background: var(--line7);
   color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center;
   margin: 0 auto 12px; font-size: 16px;
 }
@@ -162,6 +191,7 @@ td input:focus { border-color: var(--accent); background: var(--surface); outlin
 .popup-row.small { font-size: 12px; }
 .popup-row.small span:last-child { color: var(--ink-faint); }
 
+/* ---------- tab bar ---------- */
 .tabbar {
   position: fixed; bottom: 0; left: 0; right: 0;
   display: flex; background: var(--surface); border-top: 1px solid var(--line);
@@ -172,4 +202,8 @@ td input:focus { border-color: var(--accent); background: var(--surface); outlin
   padding: 9px 0 8px; border: none; background: none; color: var(--ink-faint);
   font: inherit; font-size: 11px; cursor: pointer;
 }
-.tabbtn.active { color: var(--accent-strong); }
+.tabbtn.active { color: var(--accent); }
+
+/* ---------- install instructions modal ---------- */
+.instr-card ol { text-align: left; padding-left: 20px; margin: 0 0 4px; font-size: 13.5px; color: var(--ink-soft); }
+.instr-card ol li { margin-bottom: 6px; }

@@ -1,5 +1,8 @@
-const CACHE = "psd-passvoice-v1";
-const SHELL = ["./", "./index.html", "./app.css", "./app.js", "./manifest.json", "./icon.svg"];
+const CACHE = "psd-passvoice-v2";
+const SHELL = [
+  "./", "./index.html", "./app.css", "./app.js", "./manifest.json",
+  "./icon.svg", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png", "./sm-logo-mark.png",
+];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

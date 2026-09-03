@@ -324,6 +324,63 @@ popupOverlay.addEventListener("click", (e) => {
   if (e.target === popupOverlay) popupOverlay.hidden = true;
 });
 
+/* ---------- 홈 화면에 추가 ---------- */
+const installBanner = document.getElementById("installBanner");
+const installBtn = document.getElementById("installBtn");
+const installBannerClose = document.getElementById("installBannerClose");
+const instrOverlay = document.getElementById("instrOverlay");
+const instrSteps = document.getElementById("instrSteps");
+const instrClose = document.getElementById("instrClose");
+
+let deferredInstallPrompt = null;
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const bannerDismissed = localStorage.getItem("psd_install_dismissed") === "1";
+
+if (!isStandalone && !bannerDismissed) {
+  if (isIOS) {
+    installBanner.hidden = false; // iOS는 beforeinstallprompt가 없어 안내만 띄운다
+  }
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installBanner.hidden = false;
+  });
+}
+
+installBtn.addEventListener("click", async () => {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installBanner.hidden = true;
+  } else if (isIOS) {
+    instrSteps.innerHTML = `
+      <li>화면 아래쪽 공유 버튼 <b>⬆︎</b> 을 누르세요</li>
+      <li>메뉴에서 <b>"홈 화면에 추가"</b>를 선택하세요</li>
+      <li>오른쪽 위 <b>추가</b>를 누르면 완료됩니다</li>
+    `;
+    instrOverlay.hidden = false;
+  } else {
+    instrSteps.innerHTML = `
+      <li>브라우저 오른쪽 위 <b>⋮</b> 메뉴를 여세요</li>
+      <li><b>"홈 화면에 추가"</b> 또는 <b>"앱 설치"</b>를 선택하세요</li>
+    `;
+    instrOverlay.hidden = false;
+  }
+});
+instrClose.addEventListener("click", () => { instrOverlay.hidden = true; });
+instrOverlay.addEventListener("click", (e) => { if (e.target === instrOverlay) instrOverlay.hidden = true; });
+
+installBannerClose.addEventListener("click", () => {
+  installBanner.hidden = true;
+  localStorage.setItem("psd_install_dismissed", "1");
+});
+
+window.addEventListener("appinstalled", () => {
+  installBanner.hidden = true;
+});
+
 /* ---------- 초기화 ---------- */
 renderDBCount();
 renderQuickList();

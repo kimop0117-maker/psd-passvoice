@@ -3,26 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f5716">
+<meta name="theme-color" content="#15298c">
 <title>PSD 패스보이스</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon.svg">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 
 <header class="topbar">
+  <img class="sm-mark" src="sm-logo-mark.png" alt="서울교통공사">
   <div class="linebadge">7</div>
   <span class="apptitle">PSD 패스보이스</span>
   <span class="statuspill" id="dbcount">0개 역 저장됨</span>
 </header>
+
+<div id="installBanner" class="install-banner" hidden>
+  <img src="icon-192.png" alt="앱 아이콘">
+  <div class="ib-text"><b>홈 화면에 추가</b>설치 없이 앱처럼 바로 열 수 있어요</div>
+  <button id="installBtn">추가</button>
+  <button id="installBannerClose" class="ib-close" aria-label="닫기">✕</button>
+</div>
 
 <main>
 
   <!-- 음성 조회 탭 -->
   <section id="tab-voice" class="tab active">
     <p class="tab-desc">역 이름을 말하면 저장된 비밀번호를 알려드립니다.</p>
+    <div class="mascot-row"><img src="icon-192.png" alt="또타 마스코트"></div>
     <div class="mic-wrap">
       <button id="micBtn" class="mic-btn" aria-label="음성으로 역 이름 말하기">
         <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
@@ -112,6 +121,15 @@
     <div class="popup-row"><span>보조잠금장치</span><b id="popupAux" class="mono">-</b></div>
     <div class="popup-row small"><span>갱신일</span><span id="popupUpdated">-</span></div>
     <button id="popupClose" class="primary-btn">닫기</button>
+  </div>
+</div>
+
+<div id="instrOverlay" class="popup-overlay" hidden>
+  <div class="popup-card instr-card">
+    <div class="popup-line"><img src="icon-192.png" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover"></div>
+    <h2>홈 화면에 추가</h2>
+    <ol id="instrSteps"></ol>
+    <button id="instrClose" class="primary-btn">확인</button>
   </div>
 </div>
 
