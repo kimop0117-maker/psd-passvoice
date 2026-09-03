@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f5716">
+<title>PSD 패스보이스</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="linebadge">7</div>
+  <span class="apptitle">PSD 패스보이스</span>
+  <span class="statuspill" id="dbcount">0개 역 저장됨</span>
+</header>
+
+<main>
+
+  <!-- 음성 조회 탭 -->
+  <section id="tab-voice" class="tab active">
+    <p class="tab-desc">역 이름을 말하면 저장된 비밀번호를 알려드립니다.</p>
+    <div class="mic-wrap">
+      <button id="micBtn" class="mic-btn" aria-label="음성으로 역 이름 말하기">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
+      </button>
+      <p id="micStatus" class="mic-status">버튼을 눌러 역 이름을 말해주세요</p>
+    </div>
+    <div class="quicklist" id="quickStationList"></div>
+  </section>
+
+  <!-- 사진 추가 탭 -->
+  <section id="tab-scan" class="tab">
+    <p class="tab-desc">표 사진을 넣으면 자동으로 인식해서 목록을 만들어 드립니다. 인식이 틀린 칸은 저장 전에 직접 고칠 수 있습니다.</p>
+
+    <label class="field">
+      <span>호선 (이 사진 전체에 적용)</span>
+      <input id="lineInput" type="text" value="7호선" inputmode="text">
+    </label>
+
+    <div class="scan-actions">
+      <label class="filebtn">
+        사진 선택 / 촬영
+        <input id="imgInput" type="file" accept="image/*">
+      </label>
+    </div>
+
+    <div id="ocrProgress" class="ocr-progress" hidden>
+      <div class="ocr-bar"><div id="ocrBarFill" class="ocr-bar-fill"></div></div>
+      <span id="ocrProgressText">인식 준비 중…</span>
+    </div>
+
+    <div id="scanPreviewWrap" hidden>
+      <img id="scanPreview" alt="선택한 표 사진 미리보기">
+    </div>
+
+    <div id="parsedWrap" hidden>
+      <h3>인식된 행 <span id="parsedCount"></span></h3>
+      <p class="hint">틀린 값은 칸을 눌러 바로 고치세요. 잘못 잡힌 행은 ✕로 지우세요.</p>
+      <div class="table-scroll">
+        <table id="parsedTable">
+          <thead>
+            <tr><th>연번</th><th>역명</th><th>이전 비밀번호</th><th>이번 비밀번호</th><th>보조잠금 비밀번호</th><th></th></tr>
+          </thead>
+          <tbody id="parsedBody"></tbody>
+        </table>
+      </div>
+      <button id="addRowBtn" class="ghost-btn">행 추가</button>
+      <button id="saveParsedBtn" class="primary-btn">전체 저장</button>
+    </div>
+  </section>
+
+  <!-- 전체 목록 탭 -->
+  <section id="tab-list" class="tab">
+    <p class="tab-desc">저장된 모든 역과 비밀번호입니다.</p>
+    <button id="addManualBtn" class="ghost-btn">역 직접 추가</button>
+    <div class="table-scroll">
+      <table id="listTable">
+        <thead>
+          <tr><th>연번</th><th>호선</th><th>역명</th><th>이전</th><th>이번</th><th>보조</th><th>갱신일</th><th></th></tr>
+        </thead>
+        <tbody id="listBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button class="tabbtn active" data-tab="tab-voice">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg>
+    음성조회
+  </button>
+  <button class="tabbtn" data-tab="tab-scan">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 3l-1.83 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.17L15 3H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+    사진추가
+  </button>
+  <button class="tabbtn" data-tab="tab-list">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/></svg>
+    전체목록
+  </button>
+</nav>
+
+<div id="popupOverlay" class="popup-overlay" hidden>
+  <div class="popup-card">
+    <div class="popup-line"><span id="popupLine">7</span></div>
+    <h2 id="popupStation">역명</h2>
+    <div class="popup-row"><span>이번 비밀번호</span><b id="popupCurr" class="mono">-</b></div>
+    <div class="popup-row"><span>보조잠금장치</span><b id="popupAux" class="mono">-</b></div>
+    <div class="popup-row small"><span>갱신일</span><span id="popupUpdated">-</span></div>
+    <button id="popupClose" class="primary-btn">닫기</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
