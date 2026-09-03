@@ -83,7 +83,7 @@ imgInput.addEventListener("change", async (e) => {
   ocrProgressText.textContent = "인식 준비 중… (처음 실행 시 한글 인식 모듈을 내려받아 다소 걸립니다)";
 
   try {
-    const { data } = await Tesseract.recognize(file, "kor+eng", {
+    const worker = await Tesseract.createWorker("kor+eng", 1, {
       logger: (m) => {
         if (m.status && typeof m.progress === "number") {
           ocrBarFill.style.width = `${Math.round(m.progress * 100)}%`;
@@ -91,15 +91,38 @@ imgInput.addEventListener("change", async (e) => {
         }
       },
     });
+    // 엑셀 표처럼 격자선이 있는 이미지는 자동 레이아웃 분석이 열을 따로따로 묶어
+    // 행 순서를 망가뜨리는 경우가 많다. "균일한 한 덩어리 텍스트"로 강제해서
+    // 위→아래 줄 순서를 그대로 유지시킨다.
+    await worker.setParameters({ tessedit_pageseg_mode: "6" });
+    const { data } = await worker.recognize(file);
+    await worker.terminate();
+
     ocrProgress.hidden = true;
     const defaultLine = document.getElementById("lineInput").value.trim();
     currentParsedRows = parseTableText(data.text, defaultLine);
     renderParsedTable();
+
+    if (currentParsedRows.length === 0) {
+      showOcrDebug(data.text);
+    } else {
+      hideOcrDebug();
+    }
   } catch (err) {
     ocrProgress.hidden = true;
     alert("인식에 실패했습니다: " + err.message);
   }
 });
+
+const ocrDebug = document.getElementById("ocrDebug");
+const ocrDebugText = document.getElementById("ocrDebugText");
+function showOcrDebug(rawText) {
+  ocrDebugText.textContent = rawText.trim() || "(인식된 글자가 없습니다)";
+  ocrDebug.hidden = false;
+}
+function hideOcrDebug() {
+  ocrDebug.hidden = true;
+}
 
 function ocrStatusKo(status) {
   const map = {
@@ -113,11 +136,22 @@ function ocrStatusKo(status) {
 }
 
 /**
+ * OCR이 숫자를 흔히 잘못 읽는 문자(O/o→0, I/l→1)를, 숫자가 섞인 토큰 안에서만 되돌린다.
+ * "장승배기역" 같은 순수 한글 토큰은 손대지 않는다.
+ */
+function normalizeOcrDigits(text) {
+  return text.replace(/\b[0-9OolI]{3,5}\b/g, (tok) => {
+    if (!/\d/.test(tok)) return tok;
+    return tok.replace(/[Oo]/g, "0").replace(/[Il]/g, "1");
+  });
+}
+
+/**
  * 사진 한 줄(=표의 한 행)을 대상으로 연번 / 역명 / 비밀번호 3종을 뽑아낸다.
  * 연번은 1~3자리 숫자, 비밀번호는 4자리 숫자라는 규칙을 이용해 구분한다.
  */
 function parseTableText(rawText, defaultLine) {
-  const lines = rawText.split("\n").map(l => l.trim()).filter(Boolean);
+  const lines = normalizeOcrDigits(rawText).split("\n").map(l => l.trim()).filter(Boolean);
   const rows = [];
   for (const line of lines) {
     const stationMatch = line.match(/([가-힣]{2,10}역)/);
@@ -171,6 +205,11 @@ function renderParsedTable() {
 }
 
 document.getElementById("addRowBtn").addEventListener("click", () => {
+  currentParsedRows.push({ seq: "", line: document.getElementById("lineInput").value.trim(), station: "", prev: "", curr: "", aux: "" });
+  renderParsedTable();
+});
+document.getElementById("addRowBtn2").addEventListener("click", () => {
+  hideOcrDebug();
   currentParsedRows.push({ seq: "", line: document.getElementById("lineInput").value.trim(), station: "", prev: "", curr: "", aux: "" });
   renderParsedTable();
 });
